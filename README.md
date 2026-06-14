@@ -27,5 +27,6 @@ AEGIS-X OMEGA uses AI-powered cascading consequence intelligence to predict chai
 ## Demo
 https://dakshkr27.github.io/demo-aegis-x-omega/
 
-## Team
-Daksh Kumar
+## Team : VINTAGE
+Kritika , Raksha , Abhinandan , Krishna , Daksh
+
