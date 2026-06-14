@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AEGIS-X OMEGA — Planetary Intelligence Platform</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ═══ RESET + TOKENS ═══════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070b12;--bg2:#0c1822;--card:rgba(255,255,255,.035);--card2:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.09);--bblue:rgba(0,212,255,.28);--bgreen:rgba(0,255,136,.32);
+  --bamber:rgba(255,170,0,.32);--bred:rgba(255,68,68,.32);
+  --t1:#f2f8ff;--t2:#a0b4c8;--t3:#5a7a94;
+  --blue:#00d4ff;--green:#00ff88;--amber:#ffaa00;--red:#ff5555;--purple:#b89aff;--teal:#00ffcc;
+  --font:'Inter',system-ui,-apple-system,sans-serif;--nav:52px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px}
+
+/* ═══ ANIMATIONS ════════════════════════════════════════════════════════════ */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes scan{0%{top:-2px;opacity:0}10%{opacity:.7}90%{opacity:.7}100%{top:100%;opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fillBar{from{width:0}to{width:var(--w)}}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes glow{0%,100%{box-shadow:0 0 4px rgba(0,212,255,.3)}50%{box-shadow:0 0 12px rgba(0,212,255,.6)}}
+
+.pulse-dot{animation:pulse 1.5s ease-in-out infinite}
+.float{animation:float 4s ease-in-out infinite}
+.float:nth-child(2){animation-delay:.5s}.float:nth-child(3){animation-delay:1s}.float:nth-child(4){animation-delay:1.5s}
+.fade-up{animation:fadeUp .4s ease forwards}
+
+/* ═══ NAV ════════════════════════════════════════════════════════════════════ */
+.nav{
+  position:sticky;top:0;z-index:1000;height:var(--nav);
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+  background:rgba(6,10,15,.97);border-bottom:1px solid var(--bblue);
+  backdrop-filter:blur(12px);
+}
+.nav-logo{font-size:15px;font-weight:700;letter-spacing:3px;color:var(--blue);text-transform:uppercase;cursor:pointer}
+.nav-logo .omega{color:var(--red)}
+.nav-tabs{display:flex;gap:2px}
+.nav-tab{
+  padding:6px 16px;border-radius:4px;font-size:11px;letter-spacing:.8px;cursor:pointer;
+  border:1px solid transparent;color:var(--t2);background:none;text-transform:uppercase;
+  transition:all .2s;font-family:var(--font);
+}
+.nav-tab:hover{color:var(--blue);border-color:var(--bblue);background:rgba(0,212,255,.05)}
+.nav-tab.active{color:var(--blue);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.5)}
+.nav-status{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:1.5px;color:var(--green)}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+
+/* ═══ PAGES ══════════════════════════════════════════════════════════════════ */
+.page{display:none;animation:fadeUp .3s ease}
+.page.active{display:block}
+
+/* ═══ LAYOUT ══════════════════════════════════════════════════════════════════ */
+.pc{padding:20px 24px}
+.grid-bg{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(0,212,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.035) 1px,transparent 1px);background-size:44px 44px}
+.sec{font-size:10px;letter-spacing:2px;color:var(--blue);margin-bottom:12px;display:flex;align-items:center;gap:10px;text-transform:uppercase}
+.sec::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(0,212,255,.35),transparent)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card-t{font-size:10px;letter-spacing:1px;color:var(--t2);margin-bottom:12px;text-transform:uppercase}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g8{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10px;text-transform:uppercase;font-weight:500}
+.badge-r{background:rgba(255,68,68,.15);color:var(--red);border:1px solid var(--bred)}
+.badge-a{background:rgba(255,170,0,.15);color:var(--amber);border:1px solid var(--bamber)}
+.badge-g{background:rgba(0,255,136,.12);color:var(--green);border:1px solid var(--bgreen)}
+.badge-b{background:rgba(0,212,255,.12);color:var(--blue);border:1px solid var(--bblue)}
+.btn{padding:10px 22px;border-radius:6px;font-size:12px;font-weight:500;letter-spacing:1px;cursor:pointer;border:none;transition:all .2s;font-family:var(--font);text-transform:uppercase}
+.btn-p{background:var(--blue);color:#060a0f}.btn-p:hover{background:#33deff;transform:translateY(-1px)}
+.btn-g{background:transparent;color:var(--blue);border:1px solid var(--bblue)}.btn-g:hover{background:rgba(0,212,255,.08)}
+
+/* ═══ METRIC CARDS ════════════════════════════════════════════════════════════ */
+.mcard{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;position:relative;overflow:hidden}
+.mcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.mcard.blue::before{background:var(--blue)}.mcard.green::before{background:var(--green)}
+.mcard.amber::before{background:var(--amber)}.mcard.red::before{background:var(--red)}
+.mcard.teal::before{background:var(--teal)}.mcard.purple::before{background:var(--purple)}
+.ml{font-size:10px;color:var(--t3);letter-spacing:.5px;margin-bottom:6px;text-transform:uppercase}
+.mv{font-size:22px;font-weight:700;color:var(--t1)}
+.ms{font-size:10px;margin-top:4px;color:var(--red)}
+.mbar{height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:10px}
+.mbar-f{height:100%;border-radius:2px}
+
+/* ═══ LANDING ════════════════════════════════════════════════════════════════ */
+.landing{min-height:calc(100vh - var(--nav));position:relative;overflow:hidden}
+.hero{text-align:center;padding:80px 24px 40px;position:relative;z-index:1}
+.hero-badge{display:inline-block;margin-bottom:20px;padding:6px 20px;border-radius:20px;border:1px solid var(--bblue);font-size:11px;letter-spacing:2.5px;color:var(--blue);background:rgba(0,212,255,.06);text-transform:uppercase}
+.hero h1{font-size:clamp(28px,5vw,52px);font-weight:700;line-height:1.1;color:var(--t1);margin-bottom:20px;letter-spacing:-1.5px}
+.hero h1 .hl{color:var(--blue)}
+.hero p{max-width:560px;margin:0 auto 36px;color:#7a9ab5;line-height:1.8;font-size:15px}
+.cascade-flow{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0;padding:0 24px 40px;position:relative;z-index:1}
+.cn{background:rgba(255,255,255,.03);border:1px solid rgba(0,212,255,.15);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--t1);text-align:center;min-width:95px}
+.ca{color:var(--blue);font-size:18px;padding:0 4px;opacity:.5}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:0 24px 40px;position:relative;z-index:1}
+.scard{background:rgba(255,255,255,.03);border:1px solid rgba(0,212,255,.1);border-radius:10px;padding:20px;text-align:center}
+.sn{font-size:28px;font-weight:700;color:var(--blue)}
+.sl{font-size:10px;color:var(--t3);margin-top:4px;letter-spacing:.8px;text-transform:uppercase}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:0 24px 60px;position:relative;z-index:1}
+.fc{background:rgba(255,255,255,.025);border:1px solid rgba(0,212,255,.1);border-radius:12px;padding:20px;transition:border-color .2s}
+.fc:hover{border-color:rgba(0,212,255,.3)}
+.fi{font-size:24px;margin-bottom:12px}
+.ft{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:8px}
+.fd{font-size:12px;color:var(--t3);line-height:1.7}
+
+/* ═══ MAP ═════════════════════════════════════════════════════════════════════ */
+#risk-map{height:340px;border-radius:10px;border:1px solid var(--bblue);background:#070d14}
+.leaflet-container{background:#070d14!important}
+.leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.65) saturate(.5)}
+
+/* ═══ TIMELINE ════════════════════════════════════════════════════════════════ */
+.ti{display:flex;align-items:flex-start;gap:12px;padding:9px 0;position:relative}
+.ti:not(:last-child)::after{content:'';position:absolute;left:11px;top:30px;bottom:-9px;width:1px;background:rgba(0,212,255,.18)}
+.tdot{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-top:2px}
+.tdot.info{background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue)}
+.tdot.warn{background:rgba(255,170,0,.12);border:1px solid var(--amber);color:var(--amber)}
+.tdot.danger{background:rgba(255,68,68,.15);border:1px solid var(--red);color:var(--red)}
+.tdot.crit{background:rgba(255,68,68,.25);border:1px solid var(--red);color:var(--red);animation:pulse 1s infinite}
+.ttl{font-size:12px;font-weight:600;color:var(--t1)}
+.tds{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* ═══ AGENTS ══════════════════════════════════════════════════════════════════ */
+.ac{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;transition:border-color .2s}
+.ac:hover{border-color:rgba(0,212,255,.25)}
+.ac.cmd{border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.05);animation:glow 3s ease-in-out infinite}
+.aicon{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.aname{font-size:12px;font-weight:600;color:var(--t1)}
+.astatus{font-size:10px;color:var(--green);letter-spacing:.5px}
+.atask{font-size:11px;color:var(--t2);line-height:1.5;margin-bottom:10px}
+.cbar-t{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.cbar-f{height:100%;border-radius:3px;transition:width 1.2s ease}
+
+/* ═══ FEED ════════════════════════════════════════════════════════════════════ */
+.feed-box{height:200px;overflow-y:auto}
+.fitem{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;animation:fadeUp .3s ease}
+.ftime{color:var(--t3);font-size:10px;font-family:monospace;margin-right:5px}
+
+/* ═══ FUTURE FORK ═════════════════════════════════════════════════════════════ */
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.fcard{border-radius:12px;padding:20px;border:1px solid var(--border);background:var(--card);position:relative}
+.fcard.rec{border-color:rgba(0,255,136,.45);background:rgba(0,255,136,.04)}
+.rbadge{position:absolute;top:12px;right:12px;font-size:9px;letter-spacing:1px;padding:3px 10px;border-radius:3px;background:rgba(0,255,136,.2);color:var(--green);border:1px solid rgba(0,255,136,.4);text-transform:uppercase}
+.frow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.flbl{font-size:11px;color:var(--t2)}
+.fval{font-size:13px;font-weight:600;color:var(--t1)}
+.ptrack{height:10px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden}
+.pfill{height:100%;border-radius:5px;width:0;transition:width 1.8s cubic-bezier(.22,1,.36,1)}
+
+/* ═══ ARCH SVG ═══════════════════════════════════════════════════════════════ */
+.arch-wrap{background:rgba(255,255,255,.015);border:1px solid rgba(0,212,255,.15);border-radius:12px;padding:20px;overflow-x:auto}
+
+/* ═══ SCROLLBAR ═══════════════════════════════════════════════════════════════ */
+.feed-box::-webkit-scrollbar{width:3px}
+.feed-box::-webkit-scrollbar-thumb{background:rgba(0,212,255,.2);border-radius:2px}
+
+/* ═══ CHART ═══════════════════════════════════════════════════════════════════ */
+.ch{position:relative;height:180px}
+.ch-lg{position:relative;height:220px}
+
+/* ═══ TABLE ═══════════════════════════════════════════════════════════════════ */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:8px 10px;color:var(--t3);font-weight:500;font-size:10px;letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.07)}
+.tbl td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;margin:1px;font-weight:500}
+
+/* ═══ RESPONSIVE ══════════════════════════════════════════════════════════════ */
+@media(max-width:900px){.g4{grid-template-columns:1fr 1fr}.g8{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}.fgrid{grid-template-columns:1fr}}
+@media(max-width:600px){.g4{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.nav-tabs{display:none}.stats-row{grid-template-columns:1fr 1fr}.feat-grid{grid-template-columns:1fr}}
+
+/* ═══ SIM PROGRESS ════════════════════════════════════════════════════════════ */
+.sim-wrap{display:none;margin-bottom:16px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:8px;padding:14px}
+.sim-bar-bg{height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin:8px 0}
+.sim-bar-fill{height:100%;background:var(--blue);border-radius:2px;width:0;transition:width .05s linear}
+
+/* ═══ UTILITY ═════════════════════════════════════════════════════════════════ */
+.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.mb24{margin-bottom:24px}.mb32{margin-bottom:32px}
+.flex{display:flex}.aic{align-items:center}.jcsb{justify-content:space-between}.gap8{gap:8px}.gap10{gap:10px}
+
+/* ═══ DEMO/SIMULATED DATA BADGE ═══════════════════════════════════════════════ */
+.demo-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;letter-spacing:1px;font-weight:600;text-transform:uppercase;
+  padding:2px 8px;border-radius:10px;
+  background:rgba(0,212,255,.08);color:var(--blue);
+  border:1px solid rgba(0,212,255,.25);
+  vertical-align:middle;white-space:nowrap;
+}
+.demo-badge::before{content:'●';font-size:7px;color:var(--blue);animation:pulse 2s ease-in-out infinite}
+
+/* ═══ DATA SOURCE CARDS ═══════════════════════════════════════════════════════ */
+.src-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.src-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;
+  padding:18px;backdrop-filter:blur(8px);transition:border-color .2s,transform .2s;
+}
+.src-card:hover{border-color:rgba(0,212,255,.3);transform:translateY(-2px)}
+.src-icon{font-size:22px;margin-bottom:10px}
+.src-name{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:6px}
+.src-desc{font-size:11px;color:var(--t3);line-height:1.6}
+
+/* ═══ RECOMMENDED ACTIONS ═════════════════════════════════════════════════════ */
+.ra-item{
+  display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:10px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(0,212,255,.12);margin-bottom:10px;
+  transition:border-color .2s;
+}
+.ra-item:hover{border-color:rgba(0,212,255,.25)}
+.ra-num{
+  width:32px;height:32px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;
+}
+.ra-stats{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
+.ra-stat{font-size:11px}
+.ra-stat .val{font-weight:700;font-size:13px}
+
+/* ═══ COMPARISON TABLE ════════════════════════════════════════════════════════ */
+.comp-table{width:100%;border-collapse:collapse;font-size:13px}
+.comp-table th{padding:12px 16px;text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--t2);border-bottom:1px solid var(--border)}
+.comp-table td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-old{color:var(--t3)}
+.comp-new{color:var(--t1);font-weight:500}
+.comp-check{color:var(--green);margin-right:6px}
+.comp-x{color:var(--red);margin-right:6px}
+
+/* ═══ SPECIES CARDS ═══════════════════════════════════════════════════════════ */
+.species-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sp-card{background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;transition:border-color .2s}
+.sp-card:hover{border-color:rgba(0,255,136,.3)}
+.sp-icon{font-size:32px;margin-bottom:8px}
+.sp-name{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:6px}
+.sp-risk{font-size:10px;padding:2px 8px;border-radius:8px;display:inline-block}
+
+/* ═══ ARCH FLOW (vertical) ════════════════════════════════════════════════════ */
+.flow-vert{display:flex;flex-direction:column;align-items:center;gap:0}
+.flow-node{
+  width:100%;max-width:480px;background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:18px 24px;text-align:center;position:relative;
+}
+.flow-node.hl{border-color:rgba(0,212,255,.4);background:rgba(0,212,255,.05)}
+.flow-node.hl2{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.05)}
+.flow-title{font-size:13px;font-weight:700;color:var(--t1);letter-spacing:.5px}
+.flow-sub{font-size:11px;color:var(--t3);margin-top:4px}
+.flow-arrow{width:2px;height:32px;position:relative;margin:2px 0}
+.flow-arrow::before{
+  content:'';position:absolute;left:0;top:0;width:2px;height:100%;
+  background:linear-gradient(180deg,rgba(0,212,255,.6),rgba(0,212,255,.1));
+}
+.flow-arrow::after{
+  content:'';position:absolute;left:-3px;top:0;width:8px;height:8px;
+  border-radius:50%;background:var(--blue);
+  animation:flowdot 2s linear infinite;
+}
+@keyframes flowdot{0%{top:0;opacity:1}100%{top:100%;opacity:0}}
+
+/* ═══ MIGRATION VIZ ═══════════════════════════════════════════════════════════ */
+.mig-viz{position:relative;height:160px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--border);overflow:hidden}
+
+/* ═══ SECTION SPACING ═════════════════════════════════════════════════════════ */
+.section-block{margin-bottom:36px}
+
+@media(max-width:900px){
+  .src-grid{grid-template-columns:1fr 1fr}
+  .species-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .src-grid{grid-template-columns:1fr}
+  .species-grid{grid-template-columns:1fr 1fr}
+  .comp-table{font-size:11px}
+  .comp-table th,.comp-table td{padding:8px 6px}
+  .ra-stats{gap:10px}
+}
+
+</style>
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════════════════════════════════════════════════════ -->
+<nav class="nav">
+  <div class="nav-logo" onclick="showPage('landing')">AEGIS&#8209;X <span class="omega">OMEGA</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('landing',this)">Overview</button>
+    <button class="nav-tab" onclick="showPage('dashboard',this)">Dashboard</button>
+    <button class="nav-tab" onclick="showPage('agents',this)">Agent Center</button>
+    <button class="nav-tab" onclick="showPage('fork',this)">Future Fork™</button>
+    <button class="nav-tab" onclick="showPage('arch',this)">Architecture</button>
+  </div>
+  <div class="nav-status">
+    <span class="sdot pulse-dot"></span>
+    <span id="nav-status-txt">SYSTEM ACTIVE</span>
+  </div>
+</nav>
+
+<!-- ══════════ PAGE: LANDING ═══════════════════════════════════════════════ -->
+<div id="page-landing" class="page active landing">
+  <div class="grid-bg"></div>
+  <div class="hero">
+    <div class="hero-badge">🌍 Planetary Intelligence Platform · El Niño Scenario Active</div>
+    <h1>Protecting Tomorrow<br><span class="hl">Before It Happens</span></h1>
+    <p>An AI-powered planetary intelligence platform that predicts cascading consequences across climate, infrastructure, ecosystems, and economies — before disaster strikes.</p>
+    <div class="flex aic" style="justify-content:center;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="showPage('dashboard',document.querySelectorAll('.nav-tab')[1])">Launch Dashboard →</button>
+      <button class="btn btn-g" onclick="showPage('fork',document.querySelectorAll('.nav-tab')[3])">Future Fork Engine™</button>
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:10px;letter-spacing:2px;color:var(--t3);margin-bottom:14px;text-transform:uppercase">Cascading Consequence Intelligence™ — El Niño Chain Reaction</div>
+  <div class="cascade-flow">
+    <div class="cn">🌊 El Niño<br><small style="color:var(--t3)">SST +1.8°C</small></div><span class="ca">→</span>
+    <div class="cn">🌧 Heavy Rain<br><small style="color:var(--t3)">+340% anomaly</small></div><span class="ca">→</span>
+    <div class="cn">🏞 Flooding<br><small style="color:var(--red)">CRITICAL</small></div><span class="ca">→</span>
+    <div class="cn">🚂 Rail Disruption<br><small style="color:var(--red)">1,240 km</small></div><span class="ca">→</span>
+    <div class="cn">📦 Supply Chain<br><small style="color:var(--amber)">3–8wk delay</small></div><span class="ca">→</span>
+    <div class="cn">🌾 Food Shortage<br><small style="color:var(--amber)">2.1M at risk</small></div><span class="ca">→</span>
+    <div class="cn">💸 Econ Loss<br><small style="color:var(--red)">$1.2B</small></div>
+  </div>
+
+  <div style="text-align:center;padding:0 24px 16px;position:relative;z-index:1">
+    <div style="font-size:22px;font-weight:700;color:var(--t1);margin-bottom:6px">Platform at Scale <span class="demo-badge" style="vertical-align:middle">Demo</span></div>
+    <div style="font-size:13px;color:var(--t3)">Designed to scale to real-time planetary intelligence across 147 countries</div>
+  </div>
+  <div class="stats-row">
+    <div class="scard float"><div class="sn" id="s-nations">147</div><div class="sl">Countries Supported <span class="demo-badge" style="margin-left:4px">Demo</span></div></div>
+    <div class="scard float"><div class="sn">2.3B</div><div class="sl">Population Impact Coverage <span class="demo-badge" style="margin-left:4px">Demo</span></div></div>
+    <div class="scard float"><div class="sn">94%</div><div class="sl">Scenario Confidence <span class="demo-badge" style="margin-left:4px">Demo</span></div></div>
+    <div class="scard float"><div class="sn">8</div><div class="sl">AI Agents Active</div></div>
+  </div>
+
+  <!-- PLANETARY DATA SOURCES -->
+  <div class="section-block" style="padding:0 24px;position:relative;z-index:1">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:22px;font-weight:700;color:var(--t1);margin-bottom:6px">Planetary Data Sources</div>
+      <div style="font-size:13px;color:var(--t3)">Built to ingest from world-class open scientific datasets</div>
+    </div>
+    <div class="src-grid">
+      <div class="src-card">
+        <div style="font-size:10px;color:var(--blue);letter-spacing:1px;font-weight:700;margin-bottom:6px;text-transform:uppercase">NOAA</div>
+        <div class="src-name">National Oceanic &amp; Atmospheric Admin</div>
+        <div class="src-desc">Climate anomalies, ENSO indices, ocean &amp; atmospheric indicators.</div>
+      </div>
+      <div class="src-card">
+        <div style="font-size:10px;color:var(--blue);letter-spacing:1px;font-weight:700;margin-bottom:6px;text-transform:uppercase">NASA Earth Data</div>
+        <div class="src-name">Satellite Earth Observation</div>
+        <div class="src-desc">Satellite imagery and environmental monitoring at planetary scale.</div>
+      </div>
+      <div class="src-card">
+        <div style="font-size:10px;color:var(--blue);letter-spacing:1px;font-weight:700;margin-bottom:6px;text-transform:uppercase">Copernicus CDS</div>
+        <div class="src-name">Climate Data Store</div>
+        <div class="src-desc">ERA5 reanalysis, seasonal forecasts, and climate projections.</div>
+      </div>
+      <div class="src-card">
+        <div style="font-size:10px;color:var(--blue);letter-spacing:1px;font-weight:700;margin-bottom:6px;text-transform:uppercase">World Bank Open Data</div>
+        <div class="src-name">Economic &amp; Development</div>
+        <div class="src-desc">GDP, infrastructure, food security and economic vulnerability data.</div>
+      </div>
+      <div class="src-card">
+        <div style="font-size:10px;color:var(--blue);letter-spacing:1px;font-weight:700;margin-bottom:6px;text-transform:uppercase">OpenStreetMap</div>
+        <div class="src-name">Infrastructure Geodata</div>
+        <div class="src-desc">Roads, railways, ports and critical infrastructure mapping.</div>
+      </div>
+      <div class="src-card">
+        <div style="font-size:10px;color:var(--blue);letter-spacing:1px;font-weight:700;margin-bottom:6px;text-transform:uppercase">GBIF</div>
+        <div class="src-name">Global Biodiversity Information</div>
+        <div class="src-desc">Species occurrences, migration routes, habitat &amp; biodiversity records.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI RECOMMENDED ACTIONS -->
+  <div class="section-block" style="padding:0 24px;position:relative;z-index:1">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:22px;font-weight:700;color:var(--t1);margin-bottom:6px">AI Recommended Actions <span class="demo-badge" style="vertical-align:middle">Demo Scenario</span></div>
+      <div style="font-size:13px;color:var(--t3)">Commander Agent intervention playbook · Strong El Niño — South Asia</div>
+    </div>
+    <div style="max-width:920px;margin:0 auto">
+      <div class="ra-item">
+        <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue)">1</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--t1)">Pre-position emergency food reserves</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">8 forward staging areas · 3 nations · 24h window</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+          <span class="badge badge-g" style="font-size:10px">Risk ↓ 38%</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green)">Save ~$420M</span>
+        </div>
+      </div>
+      <div class="ra-item">
+        <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue)">2</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--t1)">Strengthen vulnerable railway corridors</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">1,240 km flagged · 4 alternate routes pre-cleared</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+          <span class="badge badge-g" style="font-size:10px">Risk ↓ 31%</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green)">Save ~$260M</span>
+        </div>
+      </div>
+      <div class="ra-item">
+        <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue)">3</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--t1)">Issue flood early-warning alerts</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">Brahmaputra + Ganges + Meghna delta zones</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+          <span class="badge badge-g" style="font-size:10px">Risk ↓ 47%</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green)">Save ~$310M</span>
+        </div>
+      </div>
+      <div class="ra-item">
+        <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue)">4</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--t1)">Protect biodiversity migration corridors</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">14 protected areas · 6 flagged species</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+          <span class="badge badge-g" style="font-size:10px">Risk ↓ 22%</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green)">Habitat preserved</span>
+        </div>
+      </div>
+      <div class="ra-item">
+        <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue)">5</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--t1)">Activate agricultural risk mitigation plans</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">5 crops at risk · 2.4M MT strategic reserve</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-shrink:0">
+          <span class="badge badge-g" style="font-size:10px">Risk ↓ 29%</span>
+          <span style="font-size:12px;font-weight:700;color:var(--green)">Save ~$210M</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BIODIVERSITY IMPACT FORECAST -->
+  <div class="section-block" style="padding:0 24px;position:relative;z-index:1">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:22px;font-weight:700;color:var(--t1);margin-bottom:6px">Biodiversity Impact Forecast <span class="demo-badge" style="vertical-align:middle">Simulated Data</span></div>
+      <div style="font-size:13px;color:var(--t3)">Species, migration &amp; habitat stress under the active scenario</div>
+    </div>
+    <div class="g4 mb16">
+      <div class="mcard green">
+        <div class="ml">Animal Migration Risk</div>
+        <div class="mv" style="color:var(--green)">HIGH</div>
+        <div class="mbar"><div class="mbar-f" style="background:var(--green);width:85%"></div></div>
+      </div>
+      <div class="mcard green">
+        <div class="ml">Breeding Cycle Disruption</div>
+        <div class="mv" style="color:var(--green)">62%</div>
+        <div class="mbar"><div class="mbar-f" style="background:var(--green);width:62%"></div></div>
+      </div>
+      <div class="mcard teal">
+        <div class="ml">Habitat Stress Score</div>
+        <div class="mv" style="color:var(--teal)">74</div>
+        <div class="mbar"><div class="mbar-f" style="background:var(--teal);width:74%"></div></div>
+      </div>
+      <div class="mcard teal">
+        <div class="ml">Species Vulnerability Flagged</div>
+        <div class="mv" style="color:var(--teal)">6</div>
+        <div class="mbar"><div class="mbar-f" style="background:var(--teal);width:40%"></div></div>
+      </div>
+    </div>
+    <div class="species-grid">
+      <div class="sp-card">
+        <div class="sp-icon">🐘</div>
+        <div class="sp-name">Asian Elephant</div>
+        <div class="sp-risk badge badge-r">CORRIDOR DISRUPTED</div>
+        <div class="mbar" style="margin-top:10px"><div class="mbar-f" style="background:var(--red);width:80%"></div></div>
+      </div>
+      <div class="sp-card">
+        <div class="sp-icon">🐯</div>
+        <div class="sp-name">Bengal Tiger</div>
+        <div class="sp-risk badge badge-r">HABITAT FLOODING</div>
+        <div class="mbar" style="margin-top:10px"><div class="mbar-f" style="background:var(--red);width:70%"></div></div>
+      </div>
+      <div class="sp-card">
+        <div class="sp-icon">🦩</div>
+        <div class="sp-name">Greater Flamingo</div>
+        <div class="sp-risk badge badge-a">BREEDING AT RISK</div>
+        <div class="mbar" style="margin-top:10px"><div class="mbar-f" style="background:var(--amber);width:55%"></div></div>
+      </div>
+      <div class="sp-card">
+        <div class="sp-icon">🐆</div>
+        <div class="sp-name">Snow Leopard</div>
+        <div class="sp-risk badge badge-a">RANGE SHIFT DETECTED</div>
+        <div class="mbar" style="margin-top:10px"><div class="mbar-f" style="background:var(--amber);width:45%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORE CAPABILITIES -->
+  <div style="text-align:center;margin-bottom:24px;position:relative;z-index:1">
+    <div style="font-size:22px;font-weight:700;color:var(--t1);margin-bottom:6px">Core Capabilities</div>
+    <div style="font-size:13px;color:var(--t3)">Six signature layers that separate AEGIS-X OMEGA from anything else</div>
+  </div>
+  <div class="feat-grid">
+    <div class="fc"><div class="fi">☁️</div><div style="font-size:10px;color:var(--blue);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase">Layer 01</div><div class="ft">Climate Signal Detection</div><div class="fd">Detects ENSO, SST and atmospheric anomalies in near real-time across global climate datasets.</div></div>
+    <div class="fc" style="border-color:rgba(0,212,255,.3);background:rgba(0,212,255,.04)"><div class="fi">🌐</div><div style="font-size:10px;color:var(--blue);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase">Layer 02</div><div class="ft">Cascading Consequence Analysis</div><div class="fd">Maps chain reactions across 8 interconnected domains — not isolated single-event forecasts.</div></div>
+    <div class="fc"><div class="fi">🚂</div><div style="font-size:10px;color:var(--blue);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase">Layer 03</div><div class="ft">Infrastructure Risk Intelligence</div><div class="fd">Scans railway, ports and logistics corridors against climate and flood risk projections.</div></div>
+    <div class="fc"><div class="fi">📊</div><div style="font-size:10px;color:var(--blue);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase">Layer 04</div><div class="ft">Economic Impact Forecasting</div><div class="fd">Quantifies multi-sector losses, GDP impact, jobs-at-risk and recovery timelines.</div></div>
+    <div class="fc"><div class="fi">🦅</div><div style="font-size:10px;color:var(--blue);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase">Layer 05</div><div class="ft">Biodiversity Intelligence</div><div class="fd">Tracks migration corridors, breeding cycles, habitat stress and species vulnerability.</div></div>
+    <div class="fc"><div class="fi">🛡️</div><div style="font-size:10px;color:var(--blue);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase">Layer 06</div><div class="ft">Decision Support Engine</div><div class="fd">Commander Agent ranks interventions with Future Fork™ Monte Carlo simulations.</div></div>
+  </div>
+
+  <!-- WHY THIS IS DIFFERENT -->
+  <div class="section-block" style="padding:0 24px;position:relative;z-index:1">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:22px;font-weight:700;color:var(--t1);margin-bottom:6px">Why This Is Different</div>
+      <div style="font-size:13px;color:var(--t3)">Traditional climate systems vs. AEGIS-X OMEGA</div>
+    </div>
+    <div class="card" style="max-width:920px;margin:0 auto;overflow-x:auto">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th style="color:var(--t3);font-size:10px;letter-spacing:1.5px">TRADITIONAL SYSTEMS</th>
+            <th style="color:var(--blue);font-size:10px;letter-spacing:1.5px">AEGIS-X OMEGA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="comp-old">Predict weather events</td>
+            <td style="color:var(--green);font-weight:600;font-size:13px">Predicts cascading consequences</td>
+          </tr>
+          <tr>
+            <td class="comp-old">Single-domain forecasting</td>
+            <td style="color:var(--green);font-weight:600;font-size:13px">Climate + Infrastructure + Economy + Biodiversity</td>
+          </tr>
+          <tr>
+            <td class="comp-old">Alerts</td>
+            <td style="color:var(--green);font-weight:600;font-size:13px">Actionable interventions ranked by AI Commander</td>
+          </tr>
+          <tr>
+            <td class="comp-old">Static dashboards</td>
+            <td style="color:var(--green);font-weight:600;font-size:13px">Live agent swarm + Future Fork simulations</td>
+          </tr>
+          <tr>
+            <td class="comp-old">Backward-looking analytics</td>
+            <td style="color:var(--green);font-weight:600;font-size:13px">Forward-looking Monte Carlo futures (A · B · C)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:40px 24px 80px;position:relative;z-index:1">
+    <div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:16px;padding:40px;max-width:580px;margin:0 auto">
+      <div style="font-size:20px;font-weight:700;color:var(--t1);margin-bottom:10px">Ready to see the future?</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:24px">The El Niño scenario is live. 8 agents are analyzing. Future Fork™ is ready.</div>
+      <div class="flex aic" style="justify-content:center;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-p" style="font-size:13px;padding:12px 32px" onclick="showPage('dashboard',document.querySelectorAll('.nav-tab')[1])">Open Live Dashboard →</button>
+        <button class="btn btn-g" style="font-size:13px;padding:12px 24px" onclick="showPage('arch',document.querySelectorAll('.nav-tab')[4])">How It Works →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: DASHBOARD ═════════════════════════════════════════════ -->
+<div id="page-dashboard" class="page pc">
+
+  <div class="flex aic jcsb mb12">
+    <div style="display:flex;align-items:center;gap:10px;background:rgba(255,68,68,.07);border:1px solid rgba(255,68,68,.25);border-radius:8px;padding:9px 16px;flex:1;margin-right:12px;flex-wrap:wrap">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block" class="pulse-dot"></span>
+      <span style="font-size:12px;font-weight:600;color:var(--red);letter-spacing:1px">ACTIVE SCENARIO</span>
+      <span style="font-size:12px;color:var(--t1)">Strong El Niño — South Asia</span>
+      <span class="demo-badge">Simulated Data</span>
+    </div>
+    <div style="font-size:11px;color:var(--t3)" id="last-upd">Updating...</div>
+  </div>
+
+  <div class="sec">PLANETARY RISK METRICS <span class="demo-badge" style="margin-left:8px">Simulated</span></div>
+  <div class="g4 mb16" id="metrics-grid"></div>
+
+  <div class="g2 mb16">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 14px 8px" class="flex aic jcsb">
+        <div style="font-size:10px;letter-spacing:1.5px;color:var(--blue);text-transform:uppercase">🗺 SOUTH ASIA LIVE RISK MAP</div>
+        <div style="font-size:10px;color:var(--green)" id="map-status">● Initializing...</div>
+      </div>
+      <div id="risk-map"></div>
+      <div style="padding:8px 14px;display:flex;gap:14px;font-size:10px;color:var(--t3);border-top:1px solid rgba(255,255,255,.05);flex-wrap:wrap">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(0,100,255,.8);margin-right:4px"></span>Flood Risk</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(255,140,0,.8);margin-right:4px"></span>Heat Zone</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px"></span>Rail Disruption</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:4px"></span>Migration</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-t">⚡ CASCADE EVENT TIMELINE</div>
+      <div id="timeline-wrap"></div>
+    </div>
+  </div>
+
+  <div class="g3 mb16">
+    <div class="card"><div class="card-t">📈 WEEKLY RAINFALL FORECAST</div><div class="ch"><canvas id="rainfallChart" aria-label="Weekly rainfall forecast"></canvas></div></div>
+    <div class="card"><div class="card-t">📉 FOOD SECURITY TREND</div><div class="ch"><canvas id="foodChart" aria-label="Food security trend"></canvas></div></div>
+    <div class="card"><div class="card-t">💰 GDP IMPACT PROJECTION</div><div class="ch"><canvas id="gdpChart" aria-label="GDP impact"></canvas></div></div>
+  </div>
+
+  <div class="mb16">
+    <div class="card">
+      <div class="card-t">🌾 CROP IMPACT BREAKDOWN</div>
+      <table class="tbl">
+        <thead><tr><th>Crop</th><th>Regions Affected</th><th style="text-align:right">Yield Drop</th><th style="text-align:right">Value Loss</th><th>Risk</th></tr></thead>
+        <tbody id="crop-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="g2 mb16">
+    <div class="card">
+      <div class="card-t">🦠 OUTBREAK RISK MATRIX</div>
+      <div id="disease-list"></div>
+    </div>
+    <div class="card">
+      <div class="card-t" style="color:var(--green)">🛡 IMMEDIATE INTERVENTIONS</div>
+      <div id="immediate-interventions">
+        <div class="ra-item" style="margin-bottom:8px">
+          <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue);width:28px;height:28px;font-size:12px">1</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--t1)">Pre-position emergency relief</div><div style="font-size:10px;color:var(--t3);margin-top:2px">8 forward staging areas · 3 nations</div></div>
+          <div style="font-size:10px;color:var(--t3)">⏱ 24h</div>
+        </div>
+        <div class="ra-item" style="margin-bottom:8px">
+          <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue);width:28px;height:28px;font-size:12px">2</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--t1)">Activate railway diversion protocols</div><div style="font-size:10px;color:var(--t3);margin-top:2px">4 alternate corridors pre-cleared</div></div>
+          <div style="font-size:10px;color:var(--t3)">⏱ 36h</div>
+        </div>
+        <div class="ra-item" style="margin-bottom:8px">
+          <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue);width:28px;height:28px;font-size:12px">3</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--t1)">Issue public health advisories</div><div style="font-size:10px;color:var(--t3);margin-top:2px">Vector prevention — 6 districts</div></div>
+          <div style="font-size:10px;color:var(--t3)">⏱ 48h</div>
+        </div>
+        <div class="ra-item">
+          <div class="ra-num" style="background:rgba(0,212,255,.12);border:1px solid var(--blue);color:var(--blue);width:28px;height:28px;font-size:12px">4</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--t1)">Deploy flood barrier assets</div><div style="font-size:10px;color:var(--t3);margin-top:2px">Brahmaputra + Ganges delta</div></div>
+          <div style="font-size:10px;color:var(--t3)">⏱ 48h</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: AGENTS ═════════════════════════════════════════════════ -->
+<div id="page-agents" class="page pc">
+  <div class="sec">AI AGENT CONTROL CENTER — 8 AGENTS ONLINE <span class="demo-badge" style="margin-left:8px">Demo Data</span></div>
+  <div class="g8 mb16" id="agents-grid"></div>
+
+  <div class="g2 mb16">
+    <div class="card">
+      <div class="card-t">📡 LIVE INTELLIGENCE FEED</div>
+      <div class="feed-box" id="feed-box"></div>
+    </div>
+    <div class="card">
+      <div class="card-t">📊 AGENT CONFIDENCE MATRIX</div>
+      <div class="ch-lg"><canvas id="confChart" aria-label="Agent confidence matrix"></canvas></div>
+    </div>
+  </div>
+
+  <div class="g3">
+    <div class="card">
+      <div class="card-t">⚡ AGENT ACTIVITY LOG</div>
+      <div id="act-log" style="font-family:monospace;font-size:11px;line-height:1.9;color:var(--t3);max-height:200px;overflow:hidden"></div>
+    </div>
+    <div class="card">
+      <div class="card-t">🧠 COMMANDER SYNTHESIS</div>
+      <div id="cmd-output"></div>
+    </div>
+    <div class="card">
+      <div class="card-t">📈 REAL-TIME CONFIDENCE TREND</div>
+      <div class="ch"><canvas id="trendChart" aria-label="Confidence trend"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: FUTURE FORK™ ══════════════════════════════════════════ -->
+<div id="page-fork" class="page pc">
+  <div class="flex aic jcsb mb16">
+    <div>
+      <div class="sec" style="margin-bottom:4px">FUTURE FORK ENGINE™ — MONTE CARLO PARALLEL SIMULATION <span class="demo-badge" style="margin-left:8px">Simulated Data</span></div>
+      <div style="font-size:12px;color:var(--t2)">Scenario: <span style="color:var(--t1)">Strong El Niño — South Asia</span> · 10,000 runs/future · Commander confidence: <span style="color:var(--green)">97% (demo)</span></div>
+    </div>
+    <button class="btn btn-g" style="font-size:11px" onclick="runSim(this)">⚡ Re-Simulate</button>
+  </div>
+
+  <div class="sim-wrap" id="sim-wrap">
+    <div class="flex aic jcsb" style="font-size:11px;margin-bottom:8px">
+      <span style="color:var(--blue);letter-spacing:1px">RUNNING MONTE CARLO SIMULATION</span>
+      <span id="sim-pct" style="color:var(--green)">0%</span>
+    </div>
+    <div class="sim-bar-bg"><div class="sim-bar-fill" id="sim-fill"></div></div>
+    <div style="font-size:10px;color:var(--t3);margin-top:6px" id="sim-msg">Initializing...</div>
+  </div>
+
+  <div class="fgrid" id="fork-cards"></div>
+
+  <div class="g3 mb16">
+    <div class="card"><div class="card-t">💸 ECONOMIC LOSS COMPARISON</div><div class="ch"><canvas id="lossChart" aria-label="Economic loss comparison"></canvas></div></div>
+    <div class="card"><div class="card-t">🎯 SUCCESS PROBABILITY</div><div class="ch"><canvas id="probChart" aria-label="Success probability"></canvas></div></div>
+    <div class="card"><div class="card-t">👥 LIVES AFFECTED</div><div class="ch"><canvas id="livesChart" aria-label="Lives affected"></canvas></div></div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="card-t" style="color:var(--green)">🛡 FUTURE C — OPTIMIZED INTERVENTION PLAYBOOK</div>
+      <div style="font-size:11px;color:var(--t3);margin-bottom:12px">Commander Agent · 97% confidence · Deploy within 72 hours</div>
+      <div id="playbook"></div>
+    </div>
+    <div class="card">
+      <div class="card-t">🕸 MULTI-DOMAIN IMPACT RADAR</div>
+      <div class="ch-lg"><canvas id="radarChart" aria-label="Multi-domain impact radar"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: BIODIVERSITY INTELLIGENCE ═════════════════════════════ -->
+<div id="page-biodiversity" class="page pc">
+  <div class="sec">BIODIVERSITY IMPACT FORECAST <span class="demo-badge" style="margin-left:8px">Demo Data</span></div>
+
+  <div class="g4 mb16">
+    <div class="mcard green">
+      <div class="ml">Animal Migration Risk</div>
+      <div class="mv">High</div>
+      <div class="ms" style="color:var(--amber)">6 corridors affected</div>
+      <div class="mbar"><div class="mbar-f" style="width:78%;background:var(--green)"></div></div>
+    </div>
+    <div class="mcard amber">
+      <div class="ml">Breeding Cycle Disruption</div>
+      <div class="mv">84%</div>
+      <div class="ms" style="color:var(--amber)">Peak breeding season overlap</div>
+      <div class="mbar"><div class="mbar-f" style="width:84%;background:var(--amber)"></div></div>
+    </div>
+    <div class="mcard red">
+      <div class="ml">Habitat Stress Score</div>
+      <div class="mv">67.8</div>
+      <div class="ms" style="color:var(--red)">Forest fragmentation rising</div>
+      <div class="mbar"><div class="mbar-f" style="width:68%;background:var(--red)"></div></div>
+    </div>
+    <div class="mcard blue">
+      <div class="ml">Species Vulnerability Index</div>
+      <div class="mv">61.4</div>
+      <div class="ms" style="color:var(--amber)">47 species at risk</div>
+      <div class="mbar"><div class="mbar-f" style="width:61%;background:var(--blue)"></div></div>
+    </div>
+  </div>
+
+  <div class="g2 mb16">
+    <div class="card">
+      <div class="card-t">🦋 SPECIES AT RISK — SOUTH ASIA</div>
+      <div class="species-grid">
+        <div class="sp-card"><div class="sp-icon">🐘</div><div class="sp-name">Asian Elephant</div><span class="sp-risk" style="background:rgba(255,170,0,.15);color:var(--amber)">HIGH</span></div>
+        <div class="sp-card"><div class="sp-icon">🐅</div><div class="sp-name">Bengal Tiger</div><span class="sp-risk" style="background:rgba(255,68,68,.15);color:var(--red)">CRITICAL</span></div>
+        <div class="sp-card"><div class="sp-icon">🦩</div><div class="sp-name">Greater Flamingo</div><span class="sp-risk" style="background:rgba(255,170,0,.15);color:var(--amber)">HIGH</span></div>
+        <div class="sp-card"><div class="sp-icon">🐆</div><div class="sp-name">Snow Leopard</div><span class="sp-risk" style="background:rgba(0,212,255,.12);color:var(--blue)">MODERATE</span></div>
+        <div class="sp-card"><div class="sp-icon">🐬</div><div class="sp-name">Gangetic Dolphin</div><span class="sp-risk" style="background:rgba(255,68,68,.15);color:var(--red)">CRITICAL</span></div>
+        <div class="sp-card"><div class="sp-icon">🦏</div><div class="sp-name">One-horned Rhino</div><span class="sp-risk" style="background:rgba(255,68,68,.15);color:var(--red)">CRITICAL</span></div>
+        <div class="sp-card"><div class="sp-icon">🐒</div><div class="sp-name">Hoolock Gibbon</div><span class="sp-risk" style="background:rgba(0,212,255,.12);color:var(--blue)">MODERATE</span></div>
+        <div class="sp-card"><div class="sp-icon">🐬</div><div class="sp-name">Irrawaddy Dolphin</div><span class="sp-risk" style="background:rgba(255,170,0,.15);color:var(--amber)">HIGH</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-t">🗺 MIGRATION ROUTE VISUALIZATION</div>
+      <div class="mig-viz" id="mig-viz-svg"></div>
+      <div style="font-size:10px;color:var(--t3);margin-top:8px;line-height:1.6">
+        Animated routes show corridors under highest disruption risk this season:
+        Bengal Tiger (Terai Arc), Asian Elephant (Eastern Himalayan), Gangetic Dolphin (Brahmaputra–Ganges).
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-t">📅 BREEDING SEASON DISRUPTION ALERTS</div>
+    <div id="breeding-alerts"></div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: ARCHITECTURE ══════════════════════════════════════════ -->
+<div id="page-arch" class="page pc">
+  <div class="flex aic" style="gap:12px;margin-bottom:20px">
+    <div class="sec" style="margin-bottom:0;flex:none">HOW AEGIS-X OMEGA WORKS</div>
+    <div style="display:flex;gap:4px">
+      <div style="padding:4px 14px;border-radius:4px;font-size:10px;letter-spacing:1px;color:var(--t2);border:1px solid transparent;text-transform:uppercase;cursor:pointer" onclick="this.style.borderColor='rgba(0,212,255,.5)';this.style.color='var(--blue)';this.nextElementSibling.style.borderColor='transparent';this.nextElementSibling.style.color='var(--t2)'">HOW AEGIS-X OMEGA WORKS</div>
+      <div style="padding:4px 14px;border-radius:4px;font-size:10px;letter-spacing:1px;color:var(--blue);border:1px solid rgba(0,212,255,.5);background:rgba(0,212,255,.08);text-transform:uppercase;cursor:pointer" onclick="this.style.borderColor='rgba(0,212,255,.5)';this.style.color='var(--blue)';this.previousElementSibling.style.borderColor='transparent';this.previousElementSibling.style.color='var(--t2)'">REFERENCE ARCHITECTURE</div>
+    </div>
+  </div>
+
+
+  <!-- VERTICAL FLOW -->
+  <div class="card mb24">
+    <div class="flow-vert">
+      <div class="flow-node hl">
+        <div class="flow-title">🌍 Climate Data Sources</div>
+        <div class="flow-sub">NOAA · NASA Earth Data · Copernicus CDS</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node" style="border-color:rgba(170,136,255,.4);background:rgba(170,136,255,.05)">
+        <div class="flow-title" style="color:var(--purple)">🧬 Planetary Intelligence Layer</div>
+        <div class="flow-sub">Ingestion · Normalisation · Signal extraction</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node hl">
+        <div class="flow-title">🔗 Cascade Consequence Engine™</div>
+        <div class="flow-sub">Chain reactions across 8 interconnected domains</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node hl2">
+        <div class="flow-title">⚡ Future Fork Engine™</div>
+        <div class="flow-sub">Monte Carlo · Futures A / B / C in parallel</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node" style="border-color:rgba(255,100,150,.4);background:rgba(255,100,150,.05)">
+        <div class="flow-title" style="color:#ff6496">🧠 AI Decision Layer</div>
+        <div class="flow-sub">Commander Agent · Intervention ranking</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node" style="border-color:rgba(255,170,0,.4);background:rgba(255,170,0,.05)">
+        <div class="flow-title" style="color:var(--amber)">🖥 Government &amp; Enterprise Dashboard</div>
+        <div class="flow-sub">Live risk map · Alerts · Decision support</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYER TERMINOLOGY -->
+  <div class="sec">INTELLIGENCE LAYERS</div>
+  <div class="g3 mb24">
+    <div class="card"><div style="font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:6px">LAYER 01</div><div style="font-size:13px;font-weight:700;color:var(--blue)">Climate Signal Detection</div><div style="font-size:11px;color:var(--t2);margin-top:6px">SST anomalies, rainfall forecasting, wind pattern analysis</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:6px">LAYER 02</div><div style="font-size:13px;font-weight:700;color:var(--blue)">Cascading Consequence Analysis</div><div style="font-size:11px;color:var(--t2);margin-top:6px">Maps chain reactions from a single climate trigger</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:6px">LAYER 03</div><div style="font-size:13px;font-weight:700;color:var(--amber)">Infrastructure Risk Intelligence</div><div style="font-size:11px;color:var(--t2);margin-top:6px">Railway, bridge and logistics vulnerability scanning</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:6px">LAYER 04</div><div style="font-size:13px;font-weight:700;color:var(--teal)">Economic Impact Forecasting</div><div style="font-size:11px;color:var(--t2);margin-top:6px">Multi-sector loss estimation and GDP impact modeling</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:6px">LAYER 05</div><div style="font-size:13px;font-weight:700;color:var(--green)">Biodiversity Intelligence</div><div style="font-size:11px;color:var(--t2);margin-top:6px">Migration corridor stress and breeding cycle disruption tracking</div></div>
+    <div class="card"><div style="font-size:10px;color:var(--t3);letter-spacing:1px;margin-bottom:6px">LAYER 06</div><div style="font-size:13px;font-weight:700;color:var(--purple)">Decision Support Engine</div><div style="font-size:11px;color:var(--t2);margin-top:6px">Commander Agent synthesis and ranked intervention playbooks</div></div>
+  </div>
+
+  <div class="sec">SYSTEM ARCHITECTURE — AEGIS-X OMEGA V1.0</div>
+
+  <div class="arch-wrap mb16">
+    <svg width="100%" viewBox="0 0 780 570" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="rgba(0,212,255,.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="rgba(0,255,136,.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <!-- Row 1: Data Sources -->
+      <text x="390" y="20" text-anchor="middle" font-size="9" fill="#3a5a74" font-family="system-ui" letter-spacing="2">DATA INGESTION LAYER</text>
+      <rect x="5"   y="26" width="97" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="53"  y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">🛰 Satellite</text>
+      <rect x="114" y="26" width="97" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="162" y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">🌤 Weather API</text>
+      <rect x="223" y="26" width="97" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="271" y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">📡 IoT Sensors</text>
+      <rect x="332" y="26" width="97" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="380" y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">🚦 Rail SCADA</text>
+      <rect x="441" y="26" width="97" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="489" y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">🦅 BioSurveys</text>
+      <rect x="550" y="26" width="97" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="598" y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">📰 News/Social</text>
+      <rect x="659" y="26" width="116" height="34" rx="6" fill="rgba(0,212,255,.07)" stroke="rgba(0,212,255,.3)" stroke-width=".8"/><text x="717" y="47" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui">📊 Econ Data</text>
+      <!-- arrows down -->
+      <line x1="53"  y1="60" x2="53"  y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="162" y1="60" x2="162" y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="271" y1="60" x2="271" y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="380" y1="60" x2="380" y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="489" y1="60" x2="489" y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="598" y1="60" x2="598" y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="717" y1="60" x2="717" y2="110" stroke="rgba(0,212,255,.2)" stroke-width=".8" marker-end="url(#arr)"/>
+      <!-- Row 2: API Layer -->
+      <text x="390" y="107" text-anchor="middle" font-size="9" fill="#3a5a74" font-family="system-ui" letter-spacing="2">API + PROCESSING LAYER</text>
+      <rect x="175" y="114" width="185" height="38" rx="7" fill="rgba(255,170,0,.07)" stroke="rgba(255,170,0,.4)" stroke-width="1"/>
+      <text x="267" y="131" text-anchor="middle" font-size="11" fill="#ffaa00" font-family="system-ui" font-weight="600">FastAPI Backend</text>
+      <text x="267" y="145" text-anchor="middle" font-size="9"  fill="#5a7a94" font-family="system-ui">Python · PostgreSQL · Redis</text>
+      <rect x="420" y="114" width="185" height="38" rx="7" fill="rgba(170,136,255,.07)" stroke="rgba(170,136,255,.4)" stroke-width="1"/>
+      <text x="512" y="131" text-anchor="middle" font-size="11" fill="#aa88ff" font-family="system-ui" font-weight="600">Data Pipeline</text>
+      <text x="512" y="145" text-anchor="middle" font-size="9"  fill="#5a7a94" font-family="system-ui">ETL · Normalise · Validate</text>
+      <line x1="267" y1="152" x2="267" y2="205" stroke="rgba(255,170,0,.25)" stroke-width=".8" marker-end="url(#arr)"/>
+      <line x1="512" y1="152" x2="512" y2="205" stroke="rgba(170,136,255,.25)" stroke-width=".8" marker-end="url(#arr)"/>
+      <!-- Row 3: Agents -->
+      <text x="390" y="202" text-anchor="middle" font-size="9" fill="#3a5a74" font-family="system-ui" letter-spacing="2">LANGGRAPH AGENT SWARM</text>
+      <rect x="4"   y="208" width="96" height="50" rx="7" fill="rgba(0,212,255,.06)"  stroke="rgba(0,212,255,.35)"  stroke-width="1"/><text x="52"  y="230" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui" font-weight="600">🌩 Climate</text>  <text x="52"  y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">94% conf</text>
+      <rect x="112" y="208" width="96" height="50" rx="7" fill="rgba(255,170,0,.06)"  stroke="rgba(255,170,0,.35)"  stroke-width="1"/><text x="160" y="230" text-anchor="middle" font-size="10" fill="#ffaa00" font-family="system-ui" font-weight="600">🚂 Infra</text>    <text x="160" y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">91% conf</text>
+      <rect x="220" y="208" width="96" height="50" rx="7" fill="rgba(0,255,136,.06)"  stroke="rgba(0,255,136,.35)"  stroke-width="1"/><text x="268" y="230" text-anchor="middle" font-size="10" fill="#00ff88" font-family="system-ui" font-weight="600">🦅 BioDiv</text>   <text x="268" y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">89% conf</text>
+      <rect x="328" y="208" width="96" height="50" rx="7" fill="rgba(0,255,204,.06)"  stroke="rgba(0,255,204,.35)"  stroke-width="1"/><text x="376" y="230" text-anchor="middle" font-size="10" fill="#00ffcc" font-family="system-ui" font-weight="600">🌾 Agri</text>     <text x="376" y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">92% conf</text>
+      <rect x="436" y="208" width="96" height="50" rx="7" fill="rgba(255,68,68,.06)"  stroke="rgba(255,68,68,.35)"  stroke-width="1"/><text x="484" y="230" text-anchor="middle" font-size="10" fill="#ff4444" font-family="system-ui" font-weight="600">🦠 Disease</text>  <text x="484" y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">87% conf</text>
+      <rect x="544" y="208" width="96" height="50" rx="7" fill="rgba(170,136,255,.06)" stroke="rgba(170,136,255,.35)" stroke-width="1"/><text x="592" y="230" text-anchor="middle" font-size="10" fill="#aa88ff" font-family="system-ui" font-weight="600">🚚 Logistics</text><text x="592" y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">90% conf</text>
+      <rect x="652" y="208" width="124" height="50" rx="7" fill="rgba(0,212,255,.06)"  stroke="rgba(0,212,255,.25)"  stroke-width="1"/><text x="714" y="230" text-anchor="middle" font-size="10" fill="#00d4ff" font-family="system-ui" font-weight="600">📊 Economic</text><text x="714" y="245" text-anchor="middle" font-size="9" fill="#5a7a94" font-family="system-ui">95% conf</text>
+      <!-- Agents → Commander -->
+      <line x1="52"  y1="258" x2="316" y2="328" stroke="rgba(0,212,255,.18)"  stroke-width=".7" marker-end="url(#arr)"/>
+      <line x1="160" y1="258" x2="333" y2="328" stroke="rgba(255,170,0,.18)"  stroke-width=".7" marker-end="url(#arr)"/>
+      <line x1="268" y1="258" x2="352" y2="328" stroke="rgba(0,255,136,.18)"  stroke-width=".7" marker-end="url(#arr)"/>
+      <line x1="376" y1="258" x2="376" y2="328" stroke="rgba(0,255,204,.18)"  stroke-width=".7" marker-end="url(#arr)"/>
+      <line x1="484" y1="258" x2="404" y2="328" stroke="rgba(255,68,68,.18)"  stroke-width=".7" marker-end="url(#arr)"/>
+      <line x1="592" y1="258" x2="425" y2="328" stroke="rgba(170,136,255,.18)" stroke-width=".7" marker-end="url(#arr)"/>
+      <line x1="714" y1="258" x2="446" y2="328" stroke="rgba(0,212,255,.18)"  stroke-width=".7" marker-end="url(#arr)"/>
+      <!-- Commander -->
+      <text x="390" y="323" text-anchor="middle" font-size="9" fill="#3a5a74" font-family="system-ui" letter-spacing="2">ORCHESTRATION LAYER</text>
+      <rect x="225" y="330" width="330" height="52" rx="10" fill="rgba(0,212,255,.09)" stroke="rgba(0,212,255,.6)" stroke-width="1.5" filter="url(#glow)"/>
+      <text x="390" y="354" text-anchor="middle" font-size="14" fill="#00d4ff" font-family="system-ui" font-weight="700">🧠 Commander Agent</text>
+      <text x="390" y="371" text-anchor="middle" font-size="10" fill="#5a7a94" font-family="system-ui">LangGraph orchestration · Cross-domain synthesis · 97% confidence</text>
+      <line x1="390" y1="382" x2="390" y2="426" stroke="rgba(0,212,255,.5)" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- Future Fork -->
+      <text x="390" y="422" text-anchor="middle" font-size="9" fill="#3a5a74" font-family="system-ui" letter-spacing="2">SIMULATION LAYER</text>
+      <rect x="195" y="430" width="390" height="52" rx="10" fill="rgba(0,255,136,.07)" stroke="rgba(0,255,136,.55)" stroke-width="1.5" filter="url(#glow)"/>
+      <text x="390" y="454" text-anchor="middle" font-size="14" fill="#00ff88" font-family="system-ui" font-weight="700">⚡ Future Fork Engine™</text>
+      <text x="390" y="471" text-anchor="middle" font-size="10" fill="#5a7a94" font-family="system-ui">Monte Carlo · 10,000 runs/scenario · Futures A / B / C parallel simulation</text>
+      <line x1="390" y1="482" x2="390" y2="516" stroke="rgba(0,255,136,.45)" stroke-width="1.5" marker-end="url(#arrg)"/>
+      <!-- Dashboard -->
+      <rect x="120" y="520" width="540" height="34" rx="7" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+      <text x="390" y="541" text-anchor="middle" font-size="12" fill="#e8f4ff" font-family="system-ui" font-weight="600">🖥 Decision Dashboard · Risk Map · Interventions · Alert System</text>
+    </svg>
+  </div>
+
+  <div class="g2 mb16">
+    <div class="card">
+      <div class="card-t">🛠 TECH STACK</div>
+      <table class="tbl">
+        <thead><tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--t1)">Frontend</td><td><span class="tag" style="background:rgba(0,212,255,.1);color:var(--blue)">Next.js 14</span><span class="tag" style="background:rgba(0,212,255,.1);color:var(--blue)">React</span><span class="tag" style="background:rgba(0,212,255,.1);color:var(--blue)">TypeScript</span></td><td style="color:var(--t3)">UI + dashboard</td></tr>
+          <tr><td style="color:var(--t1)">Styling</td><td><span class="tag" style="background:rgba(170,136,255,.1);color:var(--purple)">TailwindCSS</span><span class="tag" style="background:rgba(170,136,255,.1);color:var(--purple)">Framer Motion</span></td><td style="color:var(--t3)">Design + animation</td></tr>
+          <tr><td style="color:var(--t1)">Charts</td><td><span class="tag" style="background:rgba(0,255,204,.1);color:var(--teal)">Chart.js 4</span><span class="tag" style="background:rgba(0,255,204,.1);color:var(--teal)">Recharts</span></td><td style="color:var(--t3)">Data visualisation</td></tr>
+          <tr><td style="color:var(--t1)">Maps</td><td><span class="tag" style="background:rgba(0,255,136,.1);color:var(--green)">Leaflet.js</span><span class="tag" style="background:rgba(0,255,136,.1);color:var(--green)">Mapbox GL</span></td><td style="color:var(--t3)">Risk map layer</td></tr>
+          <tr><td style="color:var(--t1)">Backend</td><td><span class="tag" style="background:rgba(255,170,0,.1);color:var(--amber)">FastAPI</span><span class="tag" style="background:rgba(255,170,0,.1);color:var(--amber)">Python 3.12</span></td><td style="color:var(--t3)">REST + SSE API</td></tr>
+          <tr><td style="color:var(--t1)">Database</td><td><span class="tag" style="background:rgba(255,68,68,.1);color:var(--red)">PostgreSQL</span><span class="tag" style="background:rgba(255,68,68,.1);color:var(--red)">Redis</span></td><td style="color:var(--t3)">Data + cache</td></tr>
+          <tr><td style="color:var(--t1)">AI Layer</td><td><span class="tag" style="background:rgba(0,212,255,.1);color:var(--blue)">LangGraph</span><span class="tag" style="background:rgba(0,212,255,.1);color:var(--blue)">Claude API</span></td><td style="color:var(--t3)">Agent orchestration</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-t">📡 REST API ENDPOINTS</div>
+      <div style="font-family:monospace;font-size:11px;line-height:2.1">
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--green);width:36px">GET</span><span style="color:var(--t1);flex:1">/api/metrics</span><span style="color:var(--t3);font-size:10px">Dashboard risk metrics</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--green);width:36px">GET</span><span style="color:var(--t1);flex:1">/api/climate</span><span style="color:var(--t3);font-size:10px">El Niño forecast data</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--green);width:36px">GET</span><span style="color:var(--t1);flex:1">/api/agents</span><span style="color:var(--t3);font-size:10px">All agent statuses</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--blue);width:36px">SSE</span><span style="color:var(--t1);flex:1">/api/feed</span><span style="color:var(--t3);font-size:10px">Live intelligence stream</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--green);width:36px">GET</span><span style="color:var(--t1);flex:1">/api/fork</span><span style="color:var(--t3);font-size:10px">Future Fork simulations</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--green);width:36px">GET</span><span style="color:var(--t1);flex:1">/api/cascade</span><span style="color:var(--t3);font-size:10px">Cascade event timeline</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--green);width:36px">GET</span><span style="color:var(--t1);flex:1">/api/map</span><span style="color:var(--t3);font-size:10px">Risk zone geodata</span></div>
+        <div class="flex aic" style="padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px"><span style="color:var(--amber);width:36px">POST</span><span style="color:var(--t1);flex:1">/api/scenario</span><span style="color:var(--t3);font-size:10px">Custom scenario simulation</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SCRIPTS ════════════════════════════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+'use strict';
+
+/* ══ PAGE ROUTER ═══════════════════════════════════════════════════════════ */
+let _mapInit=false, _agentInit=false, _forkInit=false, _dashInit=false, _bioInit=false;
+
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  else {
+    const idx={landing:0,dashboard:1,agents:2,fork:3,arch:4}[id]||0;
+    document.querySelectorAll('.nav-tab')[idx]?.classList.add('active');
+  }
+  const statusEl=document.getElementById('nav-status-txt');
+  if(statusEl){
+    if(id==='agents'){statusEl.textContent='8 AGENTS ACTIVE';}
+    else if(id==='fork'){statusEl.textContent='SIMULATION READY';}
+    else{statusEl.textContent='SYSTEM ACTIVE';}
+  }
+  if(id==='dashboard'    && !_dashInit){ _dashInit=true; initDashboard(); }
+  if(id==='agents'       && !_agentInit){ _agentInit=true; initAgents(); }
+  if(id==='fork'         && !_forkInit){ _forkInit=true; initFork(); }
+  if(id==='biodiversity' && !_bioInit){ _bioInit=true; initBiodiversity(); }
+}
+
+
+/* ══ MOCK DATA ═════════════════════════════════════════════════════════════ */
+const METRICS = [
+  {k:'global_risk_score',    v:84.2,  l:'Global Risk Score',    c:'red',   suf:'',  sub:'↑ +12.4 from baseline', bw:84},
+  {k:'climate_risk_index',   v:91.7,  l:'Climate Risk Index',   c:'amber', suf:'',  sub:'El Niño +2.1σ', bw:92},
+  {k:'infra_health',         v:43.1,  l:'Infrastructure Health',c:'amber', suf:'%', sub:'Railway stress CRITICAL', bw:43},
+  {k:'biodiversity_health',  v:61.4,  l:'Biodiversity Health',  c:'green', suf:'%', sub:'Migration disrupted', bw:61},
+  {k:'economic_risk',        v:'$1.2B',l:'Economic Risk',       c:'red',   suf:'',  sub:'Projected (no action)', bw:88},
+  {k:'food_security',        v:52.3,  l:'Food Security Index',  c:'amber', suf:'',  sub:'↓ 18.6 from baseline', bw:52},
+  {k:'disease_threat',       v:74,        l:'Disease Threat',   c:'red',   suf:'',  sub:'Vector risk +34%', bw:74},
+  {k:'logistics_stability',  v:38.9,  l:'Logistics Stability',  c:'teal',  suf:'%', sub:'3 corridors disrupted', bw:39},
+];
+
+const CASCADE = [
+  {n:1,e:'El Niño Detected',              s:'info',   d:'SST anomaly +1.8°C confirmed — South Asian basin',p:99},
+  {n:2,e:'Heavy Rainfall Forecast',        s:'warn',   d:'+340% above seasonal average — peak at week 8',   p:94},
+  {n:3,e:'Flood Risk Elevated',            s:'danger', d:'3 river basins exceeding 10-year flood threshold', p:91},
+  {n:4,e:'Railway Vulnerability Increased',s:'danger', d:'1,240 km of track at critical disruption risk',   p:87},
+  {n:5,e:'Supply Chain Delays',            s:'warn',   d:'3–8 week delays across 14 logistics corridors',   p:83},
+  {n:6,e:'Food Security Threat',           s:'crit',   d:'Crop yield −12–18%. 2.1M people at food risk',    p:78},
+  {n:7,e:'Economic Impact',               s:'crit',   d:'$1.2B projected loss — intervention required NOW', p:74},
+];
+
+const AGENTS_LIST = [
+  {id:'climate',       name:'Climate Intelligence',  conf:94, task:'Analyzing El Niño SST anomaly patterns across Bay of Bengal',      icon:'🌩️',color:'#00d4ff',bg:'rgba(0,212,255,.15)'},
+  {id:'infrastructure',name:'Infrastructure Agent',  conf:91, task:'Assessing railway vulnerability matrix — 1,240 km at risk',        icon:'🚂',color:'#ffaa00',bg:'rgba(255,170,0,.15)'},
+  {id:'biodiversity',  name:'Biodiversity Agent',    conf:89, task:'Tracking migration corridor disruptions — 6 species flagged',      icon:'🦅',color:'#00ff88',bg:'rgba(0,255,136,.15)'},
+  {id:'agriculture',   name:'Agriculture Agent',     conf:92, task:'Forecasting multi-crop yield impacts — 5 major crops affected',    icon:'🌾',color:'#00ffcc',bg:'rgba(0,255,204,.15)'},
+  {id:'disease',       name:'Disease Intelligence',  conf:87, task:'Predicting vector-borne outbreak risks — 5 diseases monitored',    icon:'🦠',color:'#ff4444',bg:'rgba(255,68,68,.15)'},
+  {id:'logistics',     name:'Logistics Agent',       conf:90, task:'Optimizing 4 alternate transport corridors — sea + road routes',   icon:'🚚',color:'#aa88ff',bg:'rgba(170,136,255,.15)'},
+  {id:'economic',      name:'Economic Agent',        conf:95, task:'Estimating multi-sector losses — $1.2B no-action baseline',        icon:'📊',color:'#00d4ff',bg:'rgba(0,212,255,.12)'},
+  {id:'commander',     name:'Commander Agent',       conf:97, task:'Synthesizing cross-domain intervention strategy — playbook ready', icon:'🧠',color:'#00d4ff',bg:'rgba(0,212,255,.25)',cmd:true},
+];
+
+const FEED_POOL = [
+  {agent:'Climate Agent',       color:'#00d4ff',msg:'SST anomaly confirmed: +1.8°C — Bay of Bengal. El Niño classification: STRONG.'},
+  {agent:'Infrastructure Agent',color:'#ffaa00',msg:'Railway disruption probability +23%. Brahmaputra corridor elevated to CRITICAL.'},
+  {agent:'Biodiversity Agent',  color:'#00ff88',msg:'Migration corridor stress detected. Bengal Tiger reserve buffer compromised.'},
+  {agent:'Agriculture Agent',   color:'#00ffcc',msg:'Crop yield reduction 12–18%. Kharif rice most severely impacted across 4 states.'},
+  {agent:'Disease Agent',       color:'#ff4444',msg:'Vector-borne disease risk elevated. Dengue probability 82% — 5 districts flagged.'},
+  {agent:'Logistics Agent',     color:'#aa88ff',msg:'Sea route diversion activated. Mumbai–Kolkata–Chittagong corridor pre-cleared.'},
+  {agent:'Economic Agent',      color:'#00d4ff',msg:'No-intervention loss: $1.2B. Optimized intervention: $90M. Net savings: $690M.'},
+  {agent:'Commander Agent',     color:'#00d4ff',msg:'Future Fork™ simulation complete. 10,000 Monte Carlo runs. Confidence: 97%.'},
+  {agent:'Commander Agent',     color:'#00d4ff',msg:'Scenario C recommended — 94% success probability. Deployment window: 72 hours.'},
+  {agent:'Climate Agent',       color:'#00d4ff',msg:'Rainfall anomaly window: weeks 4–12. Peak intensity predicted at week 8.'},
+  {agent:'Biodiversity Agent',  color:'#00ff88',msg:'Breeding season alert: One-horned Rhinoceros disruption probability 84%.'},
+  {agent:'Disease Agent',       color:'#ff4444',msg:'Vector breeding sites +280%. Healthcare system strain index: 67%.'},
+  {agent:'Infrastructure Agent',color:'#ffaa00',msg:'5 vulnerable rail sections identified. At-risk track: 1,240 km, 3 zones.'},
+  {agent:'Economic Agent',      color:'#00d4ff',msg:'GDP impact without action: −2.8%. 840,000 jobs at risk in affected regions.'},
+];
+
+const FUTURES = [
+  {id:'A',label:'Future A',sub:'No Intervention',                  color:'#ff4444',loss:'$1.2B', lossN:1200, infra:'Severe',   bio:'Severe',   food:'High',     flood:'Critical', dis:'High',      lives:'4.7M', livesN:4700000, prob:32, conf:96, gdp:-2.8, jobs:840000, rec:4.2},
+  {id:'B',label:'Future B',sub:'Targeted Infrastructure Protection',color:'#ffaa00',loss:'$480M',lossN:480,  infra:'Moderate', bio:'Moderate', food:'Medium',  flood:'High',     dis:'Moderate',  lives:'1.9M', livesN:1900000, prob:71, conf:93, gdp:-1.1, jobs:290000, rec:1.8},
+  {id:'C',label:'Future C',sub:'Full Preventive Action',            color:'#00ff88',loss:'$180M',lossN:180,  infra:'Low',      bio:'Minimal',  food:'Low',     flood:'Moderate', dis:'Controlled',lives:'340K', livesN:340000,  prob:94, conf:97, gdp:-0.3, jobs:48000,  rec:0.6, recommended:true, savings:1020},
+];
+
+
+const CHART_OPT = (yCallback) => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{display:false}},
+  scales:{
+    x:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+    y:{ticks:{color:'#5a7a94',font:{size:10},callback:yCallback||undefined},grid:{color:'rgba(255,255,255,.05)'}}
+  }
+});
+
+/* ══ DASHBOARD ═════════════════════════════════════════════════════════════ */
+function initDashboard() {
+  renderMetrics();
+  renderTimeline();
+  initMap();
+  initDashCharts();
+  renderCrops();
+  renderDisease();
+  renderRecommendedActions();
+  setInterval(refreshMetrics, 7000);
+}
+
+function renderRecommendedActions() {
+  const actions = [
+    {p:1, title:'Pre-position emergency food reserves',           color:'#ff4444', risk:'−38%', risk_label:'Food shortage risk', savings:'$210M', desc:'Strategic grain reserves released to high-risk districts ahead of flood peak (week 8).'},
+    {p:2, title:'Strengthen vulnerable railway corridors',          color:'#ffaa00', risk:'−42%', risk_label:'Disruption probability', savings:'$340M', desc:'Reinforce embankments and elevate track on the 5 highest-risk sections (1,240 km).'},
+    {p:3, title:'Issue flood early-warning alerts',                 color:'#00d4ff', risk:'−55%', risk_label:'Casualty risk', savings:'$95M',  desc:'72-hour advance warnings to 2.1M people across 6 flood-prone districts.'},
+    {p:4, title:'Protect biodiversity migration corridors',         color:'#00ff88', risk:'−47%', risk_label:'Habitat disruption', savings:'$60M',  desc:'Temporary protected status for 14 migration corridors during breeding season.'},
+    {p:5, title:'Activate agricultural risk mitigation plans',      color:'#00ffcc', risk:'−31%', risk_label:'Crop yield loss', savings:'$215M', desc:'Drought/flood-resistant seed distribution and crop insurance fast-track for 1.2M farmers.'},
+  ];
+  document.getElementById('recommended-actions').innerHTML = actions.map(a=>`
+    <div class="ra-item">
+      <div class="ra-num" style="background:${a.color}22;border:1px solid ${a.color}55;color:${a.color}">${a.p}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--t1)">Priority ${a.p}: ${a.title}</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:4px;line-height:1.6">${a.desc}</div>
+        <div class="ra-stats">
+          <div class="ra-stat"><span style="color:var(--t3)">${a.risk_label}: </span><span class="val" style="color:${a.color}">${a.risk}</span></div>
+          <div class="ra-stat"><span style="color:var(--t3)">Est. economic savings: </span><span class="val" style="color:var(--green)">${a.savings}</span></div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderMetrics() {
+  const barColors={red:'#ff4444',amber:'#ffaa00',green:'#00ff88',teal:'#00ffcc',blue:'#00d4ff'};
+  document.getElementById('metrics-grid').innerHTML = METRICS.map(m=>`
+    <div class="mcard ${m.c}">
+      <div class="ml">${m.l}</div>
+      <div class="mv" id="mv-${m.k}">${m.v}${m.suf}</div>
+      <div class="ms">${m.sub}</div>
+      <div class="mbar"><div class="mbar-f" style="width:${m.bw}%;background:${barColors[m.c]}"></div></div>
+    </div>`).join('');
+  document.getElementById('last-upd').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+function refreshMetrics() {
+  METRICS.forEach(m=>{
+    if(typeof m.v==='number'){
+      const drift=(Math.random()-.5)*.4;
+      const newV=parseFloat((m.v+drift).toFixed(1));
+      const el=document.getElementById('mv-'+m.k);
+      if(el) el.textContent=newV+m.suf;
+    }
+  });
+  document.getElementById('last-upd').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+function renderTimeline() {
+  const badgeMap={info:'badge-b',warn:'badge-a',danger:'badge-r',crit:'badge-r'};
+  const lblMap={info:'DETECTED',warn:'ELEVATED',danger:'CRITICAL',crit:'CRITICAL'};
+  document.getElementById('timeline-wrap').innerHTML=CASCADE.map(c=>`
+    <div class="ti">
+      <div class="tdot ${c.s}">${c.n}</div>
+      <div style="flex:1">
+        <div class="ttl">${c.e}</div>
+        <div class="tds">${c.d}</div>
+        <div style="margin-top:5px;display:flex;align-items:center;gap:8px">
+          <span class="badge ${badgeMap[c.s]}">${lblMap[c.s]}</span>
+          <span style="font-size:10px;color:var(--t3)">${c.p}% prob.</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+let _leafMap=null;
+function initMap() {
+  if(_leafMap) return;
+  _leafMap = L.map('risk-map',{zoomControl:true,scrollWheelZoom:false}).setView([23.5,83.5],4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:10,opacity:.5}).addTo(_leafMap);
+  document.getElementById('map-status').textContent='● Live';
+
+  // Flood zones
+  [{lat:26.1,lng:90.5,r:55000,n:'Brahmaputra Delta',rv:'CRITICAL'},
+   {lat:25.3,lng:87.8,r:68000,n:'Ganges Flood Plain',rv:'HIGH'},
+   {lat:20.9,lng:84.2,r:42000,n:'Mahanadi Basin',rv:'HIGH'},
+   {lat:22.8,lng:90.9,r:40000,n:'Meghna Estuary',rv:'CRITICAL'}]
+  .forEach(z=>L.circle([z.lat,z.lng],{radius:z.r,color:'#0066ff',fillColor:'rgba(0,80,255,.3)',fillOpacity:.5,weight:1.5}).addTo(_leafMap).bindPopup(`<b>${z.n}</b><br>Flood Risk: <b style="color:#ff4444">${z.rv}</b>`));
+
+  // Heat zones
+  [{lat:26.9,lng:73.8,n:'Rajasthan Heat Dome'},{lat:21.1,lng:79.1,n:'Vidarbha Heat Corridor'}]
+  .forEach(h=>L.circle([h.lat,h.lng],{radius:85000,color:'rgba(255,140,0,.8)',fillColor:'rgba(255,120,0,.15)',fillOpacity:.5,weight:1}).addTo(_leafMap).bindPopup(`<b>${h.n}</b><br>Heat Stress Zone`));
+
+  // Rail disruptions
+  const rIcon=L.divIcon({html:'<div style="background:#ff4444;border:2px solid #ff8888;border-radius:50%;width:13px;height:13px;box-shadow:0 0 10px rgba(255,68,68,.7)"></div>',className:''});
+  [{lat:26.4,lng:93.8,n:'Assam Valley Railway',d:18},{lat:24.8,lng:88.3,n:'Bengal-Bihar Corridor',d:12},
+   {lat:25.7,lng:93.2,n:'NE Frontier Railway',d:21},{lat:20.3,lng:85.8,n:'Odisha Coastal Rail',d:9},{lat:24.1,lng:91.4,n:'Bangladesh Railway N',d:24}]
+  .forEach(r=>L.marker([r.lat,r.lng],{icon:rIcon}).addTo(_leafMap).bindPopup(`<b>${r.n}</b><br>Disruption est: <b>${r.d} days</b>`));
+
+  // Migration corridors
+  const mOpt={color:'#00ff88',weight:2,dashArray:'6 4',opacity:.7};
+  L.polyline([[27.2,84.1],[26.5,85.8],[25.9,87.4]],mOpt).addTo(_leafMap).bindPopup('Bengal Tiger Migration Corridor');
+  L.polyline([[26.8,92.4],[26.5,92.9],[26.2,93.5]],mOpt).addTo(_leafMap).bindPopup('Eastern Himalayan Elephant Corridor');
+
+  const mIcon=L.divIcon({html:'<div style="background:#00ff88;border-radius:50%;width:9px;height:9px;box-shadow:0 0 8px rgba(0,255,136,.6)"></div>',className:''});
+  [[27.2,84.1],[26.5,92.9]].forEach(p=>L.marker(p,{icon:mIcon}).addTo(_leafMap));
+
+  setTimeout(()=>_leafMap.invalidateSize(),300);
+}
+
+function initDashCharts() {
+  new Chart(document.getElementById('rainfallChart'),{type:'bar',data:{
+    labels:['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12'],
+    datasets:[{data:[45,89,134,198,243,267,289,312,278,234,167,98],backgroundColor:'rgba(0,100,255,.4)',borderColor:'rgba(0,150,255,.8)',borderWidth:1,borderRadius:3}]
+  },options:{...CHART_OPT(v=>v+'mm'),scales:{x:{ticks:{color:'#5a7a94',font:{size:9}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#5a7a94',font:{size:9},callback:v=>v+'mm'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+
+  new Chart(document.getElementById('foodChart'),{type:'line',data:{
+    labels:['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'],
+    datasets:[{data:[72,68,61,55,52,49,53,58,65],borderColor:'#ffaa00',backgroundColor:'rgba(255,170,0,.1)',tension:.4,fill:true,pointRadius:3}]
+  },options:CHART_OPT()});
+
+  new Chart(document.getElementById('gdpChart'),{type:'line',data:{
+    labels:['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'],
+    datasets:[{data:[98.2,96.4,93.1,89.7,87.3,85.8,87.9,91.2,94.6],borderColor:'#ff4444',backgroundColor:'rgba(255,68,68,.08)',tension:.4,fill:true,pointRadius:3}]
+  },options:CHART_OPT()});
+}
+
+function renderCrops() {
+  const crops=[
+    {c:'Rice (Kharif)',r:'Assam, West Bengal, Odisha, Bangladesh',d:18,l:'$340M',risk:'HIGH'},
+    {c:'Jute',         r:'West Bengal, Bangladesh',                d:24,l:'$89M', risk:'HIGH'},
+    {c:'Tea',          r:'Assam, Darjeeling',                      d:12,l:'$67M', risk:'MODERATE'},
+    {c:'Mustard',      r:'Bihar, Uttar Pradesh',                   d:31,l:'$45M', risk:'HIGH'},
+    {c:'Maize',        r:'Bihar, Northeast India',                 d:9, l:'$28M', risk:'MODERATE'},
+  ];
+  document.getElementById('crop-tbody').innerHTML=crops.map(c=>{
+    const rc=c.risk==='HIGH'?'#ff4444':'#ffaa00';
+    return `<tr><td style="color:var(--t1);font-weight:500">${c.c}</td><td style="color:var(--t3);font-size:11px">${c.r}</td><td style="text-align:right;color:var(--red)">−${c.d}%</td><td style="text-align:right;color:var(--t1)">${c.l}</td><td><span style="color:${rc};font-size:11px;font-weight:600">${c.risk}</span></td></tr>`;
+  }).join('');
+}
+
+function renderDisease() {
+  const d=[
+    {n:'Dengue Fever',          p:82,r:'Bangladesh, W.Bengal', cases:'~124K projected cases',risk:'HIGH'},
+    {n:'Malaria (P. falciparum)',p:74,r:'Odisha, Assam',        cases:'~89K projected cases', risk:'HIGH'},
+    {n:'Cholera',               p:67,r:'Bangladesh, Bihar',     cases:'~34K projected cases', risk:'ELEVATED'},
+    {n:'Leptospirosis',         p:61,r:'Kerala, Assam',         cases:'~18K projected cases', risk:'MODERATE'},
+    {n:'Japanese Encephalitis', p:54,r:'Bihar, UP',             cases:'~8.4K projected cases',risk:'MODERATE'},
+  ];
+  document.getElementById('disease-list').innerHTML=d.map(x=>{
+    const rc=x.risk==='HIGH'?'#ff4444':x.risk==='ELEVATED'?'#ffaa00':'#00d4ff';
+    return `<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:10px">
+      <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--t1)">${x.n}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${x.r} · ${x.cases}</div></div>
+      <div style="text-align:right"><div style="font-size:15px;font-weight:700;color:${rc}">${x.p}%</div><div style="font-size:10px;color:${rc};letter-spacing:.5px">${x.risk}</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ══ AGENTS ════════════════════════════════════════════════════════════════ */
+let _trendChart,_trendData=[],_trendLabels=[];
+
+function initAgents() {
+  renderAgentCards();
+  initConfChart();
+  initTrendChart();
+  renderCmdOutput();
+  connectFeed();
+  setInterval(updateLog, 2000);
+  setInterval(()=>{ driftConf(); updateTrend(); }, 4000);
+  for(let i=0;i<6;i++) updateTrend();
+}
+
+function renderAgentCards() {
+  document.getElementById('agents-grid').innerHTML=AGENTS_LIST.map(a=>`
+    <div class="ac ${a.cmd?'cmd':''}">
+      <div class="flex aic gap10 mb8">
+        <div class="aicon" style="background:${a.bg};border:1px solid ${a.color}55">${a.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div class="aname" style="${a.cmd?'color:'+a.color:''}">${a.name}</div>
+          <div class="astatus">● ACTIVE</div>
+        </div>
+        <div style="font-size:18px;font-weight:700;color:${a.color}" id="aconf-${a.id}">${a.conf}%</div>
+      </div>
+      <div class="atask">${a.task}</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px">
+        <span style="color:var(--t3)">Confidence</span><span style="color:${a.color}">${a.conf}%</span>
+      </div>
+      <div class="cbar-t"><div class="cbar-f" style="width:${a.conf}%;background:${a.color}"></div></div>
+    </div>`).join('');
+}
+
+function driftConf() {
+  const bases={climate:94,infrastructure:91,biodiversity:89,agriculture:92,disease:87,logistics:90,economic:95,commander:97};
+  AGENTS_LIST.forEach(a=>{
+    a.conf=Math.max(82,Math.min(99,bases[a.id]+Math.round((Math.random()-.5)*3)));
+    const el=document.getElementById('aconf-'+a.id);
+    if(el) el.textContent=a.conf+'%';
+  });
+}
+
+function initConfChart() {
+  new Chart(document.getElementById('confChart'),{type:'bar',data:{
+    labels:AGENTS_LIST.map(a=>a.name.split(' ')[0]),
+    datasets:[{data:AGENTS_LIST.map(a=>a.conf),backgroundColor:AGENTS_LIST.map(a=>a.color+'33'),borderColor:AGENTS_LIST.map(a=>a.color),borderWidth:1.5,borderRadius:4}]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+    x:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+    y:{min:82,max:100,ticks:{color:'#5a7a94',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}}
+  }}});
+}
+
+function initTrendChart() {
+  _trendChart=new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:_trendLabels,datasets:[{label:'Avg Confidence',data:_trendData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.08)',tension:.4,fill:true,pointRadius:2}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+    x:{ticks:{color:'#5a7a94',font:{size:9},maxTicksLimit:7},grid:{color:'rgba(255,255,255,.03)'}},
+    y:{min:88,max:99,ticks:{color:'#5a7a94',font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.04)'}}
+  }}});
+}
+
+function updateTrend() {
+  const avg=parseFloat((AGENTS_LIST.reduce((s,a)=>s+a.conf,0)/AGENTS_LIST.length+(Math.random()-.5)*.3).toFixed(1));
+  _trendLabels.push(new Date().toLocaleTimeString().slice(0,8));
+  _trendData.push(avg);
+  if(_trendLabels.length>20){_trendLabels.shift();_trendData.shift();}
+  _trendChart?.update('none');
+}
+
+const LOG_MSGS=['> climate_agent.analyze(sst_data) → anomaly: +1.8°C','> infra_agent.scan(rail_network) → at_risk: 1240km','> bio_agent.track(corridors) → stress: HIGH','> agri_agent.forecast(crops) → drop: 14.7%','> disease_agent.predict() → risk: ELEVATED','> logistics_agent.optimize() → alt_paths: 4','> economic_agent.estimate() → loss: $1.2B','> commander_agent.synthesize() → playbook: READY','> fork_engine.simulate(runs=10000) → OK','> commander_agent.recommend() → future_c: 94%'];
+let _logIdx=0;
+function updateLog(){
+  const log=document.getElementById('act-log');
+  if(!log)return;
+  const el=document.createElement('div');
+  el.style.color='#00ff88';
+  el.textContent=LOG_MSGS[_logIdx++%LOG_MSGS.length];
+  log.appendChild(el);
+  if(log.children.length>10)log.removeChild(log.firstChild);
+}
+
+let _feedIdx=0;
+function connectFeed() {
+  const tick=()=>{
+    const item=FEED_POOL[_feedIdx++%FEED_POOL.length];
+    const box=document.getElementById('feed-box');
+    if(!box)return;
+    const el=document.createElement('div');
+    el.className='fitem';
+    el.innerHTML=`<span class="ftime">${new Date().toLocaleTimeString()}</span><span style="font-weight:600;color:${item.color}">[${item.agent}]</span> <span style="color:var(--t1)">${item.msg}</span>`;
+    box.insertBefore(el,box.firstChild);
+    while(box.children.length>18)box.removeChild(box.lastChild);
+  };
+  tick();
+  setInterval(tick,2500);
+}
+
+function renderCmdOutput(){
+  document.getElementById('cmd-output').innerHTML=`
+    <div style="font-size:11px;color:var(--t2);margin-bottom:10px">Cross-domain synthesis complete</div>
+    ${[['El Niño Severity','STRONG (ONI 1.9)','#ff4444'],['Cascade Risk','7-stage confirmed','#ffaa00'],['Optimal Strategy','Future C — 94%','#00ff88'],['Deployment Window','72 hours','#e8f4ff'],['Net Savings','$690M','#00ff88'],['Lives Protected','4.36M','#00d4ff']]
+    .map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span style="font-size:11px;color:var(--t2)">${l}</span><span style="font-size:12px;font-weight:700;color:${c}">${v}</span></div>`).join('')}
+    <button class="btn btn-g" style="margin-top:14px;width:100%;font-size:11px" onclick="showPage('fork',document.querySelectorAll('.nav-tab')[3])">View Future Fork Engine™ →</button>`;
+}
+
+/* ══ FUTURE FORK ═══════════════════════════════════════════════════════════ */
+function initFork() {
+  renderForkCards();
+  initForkCharts();
+  renderPlaybook();
+}
+
+function renderForkCards() {
+  document.getElementById('fork-cards').innerHTML=FUTURES.map(f=>`
+    <div class="fcard ${f.recommended?'rec':''}">
+      ${f.recommended?'<div class="rbadge">✓ RECOMMENDED</div>':''}
+      <div style="font-size:15px;font-weight:700;color:${f.color};margin-bottom:16px">${f.label} <span style="font-size:12px;font-weight:400;color:var(--t2)">— ${f.sub}</span></div>
+      <div class="frow"><span class="flbl">Economic Loss</span><span class="fval" style="color:${f.color}">${f.loss}</span></div>
+      <div class="frow"><span class="flbl">Infrastructure</span><span class="fval">${f.infra}</span></div>
+      <div class="frow"><span class="flbl">Biodiversity</span><span class="fval">${f.bio}</span></div>
+      <div class="frow"><span class="flbl">Food Risk</span><span class="fval">${f.food}</span></div>
+      <div class="frow"><span class="flbl">Flood Severity</span><span class="fval">${f.flood}</span></div>
+      <div class="frow"><span class="flbl">Disease Risk</span><span class="fval">${f.dis}</span></div>
+      <div class="frow"><span class="flbl">Lives Affected</span><span class="fval">${f.lives}</span></div>
+      <div class="frow"><span class="flbl">GDP Impact</span><span class="fval" style="color:var(--red)">${f.gdp}%</span></div>
+      <div class="frow"><span class="flbl">Jobs at Risk</span><span class="fval">${(f.jobs/1000).toFixed(0)}K</span></div>
+      <div class="frow"><span class="flbl">Recovery Time</span><span class="fval">${f.rec} years</span></div>
+      ${f.savings?`<div class="frow"><span class="flbl">Net Savings</span><span class="fval" style="color:var(--green)">$${f.savings}M</span></div>`:''}
+      <div style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--t2)">Success Probability</span>
+          <span style="font-size:20px;font-weight:700;color:${f.color}">${f.prob}%</span>
+        </div>
+        <div class="ptrack"><div class="pfill" data-w="${f.prob}" style="background:${f.color}"></div></div>
+        <div style="font-size:10px;color:var(--t3);margin-top:6px">Confidence: ${f.conf}% · 10,000 Monte Carlo runs</div>
+      </div>
+    </div>`).join('');
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll('.pfill').forEach(el=>{el.style.width=el.dataset.w+'%';});
+  }));
+}
+
+function initForkCharts() {
+  const bc=(colors)=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+    x:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+    y:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.05)'}}
+  }});
+  const labels=FUTURES.map(f=>f.label);
+  const colors=FUTURES.map(f=>f.color+'4D');
+  const borders=FUTURES.map(f=>f.color);
+
+  new Chart(document.getElementById('lossChart'),{type:'bar',data:{
+    labels,
+    datasets:[{data:FUTURES.map(f=>f.lossN),backgroundColor:colors,borderColor:borders,borderWidth:1.5,borderRadius:5}]
+  },options:{...bc(),scales:{x:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#5a7a94',font:{size:10},callback:v=>'$'+v+'M'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+
+  new Chart(document.getElementById('probChart'),{type:'bar',data:{
+    labels,
+    datasets:[{data:FUTURES.map(f=>f.prob),backgroundColor:colors,borderColor:borders,borderWidth:1.5,borderRadius:5}]
+  },options:{...bc(),scales:{x:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},y:{min:0,max:100,ticks:{color:'#5a7a94',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+
+  new Chart(document.getElementById('livesChart'),{type:'bar',data:{
+    labels,
+    datasets:[{data:FUTURES.map(f=>f.livesN),backgroundColor:colors,borderColor:borders,borderWidth:1.5,borderRadius:5}]
+  },options:{...bc(),scales:{x:{ticks:{color:'#5a7a94',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#5a7a94',font:{size:10},callback:v=>(v/1e6).toFixed(1)+'M'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+
+  new Chart(document.getElementById('radarChart'),{type:'radar',data:{
+    labels:['Economic','Infrastructure','Biodiversity','Agriculture','Disease','Logistics'],
+    datasets:[
+      {label:'Future A',data:[95,90,88,85,80,82],borderColor:'#ff4444',backgroundColor:'rgba(255,68,68,.1)',pointBackgroundColor:'#ff4444',pointRadius:3},
+      {label:'Future B',data:[55,58,55,52,50,48],borderColor:'#ffaa00',backgroundColor:'rgba(255,170,0,.08)',pointBackgroundColor:'#ffaa00',pointRadius:3},
+      {label:'Future C',data:[12,15,10,14,12,18],borderColor:'#00ff88',backgroundColor:'rgba(0,255,136,.08)',pointBackgroundColor:'#00ff88',pointRadius:3}
+    ]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8aa0b8',font:{size:10},boxWidth:10}}},scales:{r:{ticks:{color:'#3a5a74',font:{size:9},backdropColor:'transparent',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.07)'},pointLabels:{color:'#8aa0b8',font:{size:10}},min:0,max:100}}}});
+}
+
+function renderPlaybook(){
+  const items=[
+    {t:'Pre-position emergency relief',         d:'8 forward staging areas across 3 nations',         dl:'24h', type:'immediate'},
+    {t:'Activate railway diversion protocols',  d:'4 alternate corridors pre-cleared and tested',     dl:'36h', type:'immediate'},
+    {t:'Issue public health advisories',        d:'Vector disease prevention — 6 high-risk districts',dl:'48h', type:'immediate'},
+    {t:'Deploy flood barrier assets',           d:'Priority: Brahmaputra + Ganges delta zones',       dl:'48h', type:'immediate'},
+    {t:'Agricultural buffer stock release',     d:'2.4M metric tons strategic national reserve',      dl:'1-2wk',type:'strategic'},
+    {t:'Wildlife corridor protection zones',    d:'14 protected migration areas — temporary closures',dl:'1-3wk',type:'strategic'},
+    {t:'Sea route logistics activation',        d:'Mumbai–Kolkata–Chittagong port diversion',         dl:'2-4wk',type:'strategic'},
+    {t:'Economic stabilization package',        d:'$2.4B mobilization · 3-nation coordination',       dl:'2-6wk',type:'strategic'},
+    {t:'Vector control spraying campaign',      d:'Pre-emptive — 6 million people covered',           dl:'1wk', type:'strategic'},
+    {t:'Cross-border coordination protocol',    d:'India, Bangladesh, Myanmar joint ops center',      dl:'72h', type:'immediate'},
+  ];
+  document.getElementById('playbook').innerHTML=items.map((item,i)=>{
+    const tc=item.type==='immediate'?'#ff4444':'#ffaa00';
+    return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);align-items:flex-start">
+      <div style="width:22px;height:22px;border-radius:50%;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.35);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--green);flex-shrink:0;font-weight:700">${i+1}</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:500;color:var(--t1)">${item.t}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${item.d}</div></div>
+      <div style="text-align:right;flex-shrink:0"><div style="font-size:10px;color:${tc};font-weight:600">⏱ ${item.dl}</div><div style="font-size:9px;color:var(--t3);margin-top:2px;text-transform:uppercase">${item.type}</div></div>
+    </div>`;
+  }).join('');
+}
+
+/* ══ BIODIVERSITY INTELLIGENCE ════════════════════════════════════════════════ */
+function initBiodiversity() {
+  renderMigrationViz();
+  renderBreedingAlerts();
+}
+
+function renderMigrationViz() {
+  const el = document.getElementById('mig-viz-svg');
+  if(!el) return;
+  el.innerHTML = `
+    <svg viewBox="0 0 400 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="migarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <!-- subtle landmass shapes -->
+      <ellipse cx="120" cy="80" rx="90" ry="55" fill="rgba(0,212,255,.04)" stroke="rgba(0,212,255,.12)" stroke-width="1"/>
+      <ellipse cx="280" cy="90" rx="100" ry="50" fill="rgba(0,255,136,.03)" stroke="rgba(0,255,136,.1)" stroke-width="1"/>
+
+      <!-- Bengal Tiger corridor -->
+      <path id="migpath1" d="M40,40 C90,30 140,55 200,50 S 300,40 360,60" fill="none" stroke="#00ff88" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#migarr)"/>
+      <text x="40" y="28" font-size="9" fill="#00ff88" font-family="system-ui">🐅 Bengal Tiger — Terai Arc</text>
+
+      <!-- Asian Elephant corridor -->
+      <path id="migpath2" d="M30,100 C100,120 170,95 240,110 S 330,130 380,105" fill="none" stroke="#ffaa00" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#migarr)"/>
+      <text x="30" y="135" font-size="9" fill="#ffaa00" font-family="system-ui">🐘 Asian Elephant — E. Himalayan</text>
+
+      <!-- Gangetic Dolphin corridor -->
+      <path id="migpath3" d="M60,75 C120,70 180,85 250,75 S 330,65 370,80" fill="none" stroke="#00d4ff" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#migarr)"/>
+      <text x="200" y="155" font-size="9" fill="#00d4ff" font-family="system-ui" text-anchor="middle">🐬 Gangetic Dolphin — Brahmaputra–Ganges</text>
+
+      <!-- animated travelling dots -->
+      <circle r="4" fill="#00ff88" style="filter:drop-shadow(0 0 4px #00ff88)">
+        <animateMotion dur="6s" repeatCount="indefinite" path="M40,40 C90,30 140,55 200,50 S 300,40 360,60"/>
+      </circle>
+      <circle r="4" fill="#ffaa00" style="filter:drop-shadow(0 0 4px #ffaa00)">
+        <animateMotion dur="7s" repeatCount="indefinite" path="M30,100 C100,120 170,95 240,110 S 330,130 380,105"/>
+      </circle>
+      <circle r="4" fill="#00d4ff" style="filter:drop-shadow(0 0 4px #00d4ff)">
+        <animateMotion dur="5.5s" repeatCount="indefinite" path="M60,75 C120,70 180,85 250,75 S 330,65 370,80"/>
+      </circle>
+    </svg>`;
+}
+
+function renderBreedingAlerts() {
+  const alerts = [
+    {species:'Bengal Tiger',           window:'Nov – Feb', prob:78, region:'Terai Arc Landscape'},
+    {species:'One-horned Rhinoceros',  window:'Oct – Mar', prob:84, region:'Kaziranga–Manas Corridor'},
+    {species:'Gangetic Dolphin',       window:'Oct – Mar', prob:91, region:'Brahmaputra–Ganges Confluence'},
+    {species:'Greater Flamingo',       window:'Sep – Dec', prob:66, region:'Chilika–Bhitarkanika Wetlands'},
+    {species:'Hoolock Gibbon',         window:'Dec – Mar', prob:58, region:'Assam Highlands'},
+  ];
+  document.getElementById('breeding-alerts').innerHTML = alerts.map(a=>{
+    const color = a.prob>=80?'#ff4444':a.prob>=65?'#ffaa00':'#00d4ff';
+    return `<div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600;color:var(--t1)">${a.species}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${a.region} · Breeding window: ${a.window}</div>
+      </div>
+      <div style="text-align:right;min-width:70px">
+        <div style="font-size:16px;font-weight:700;color:${color}">${a.prob}%</div>
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase">disruption risk</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+
+const SIM_MSGS=['Initializing agent swarm...','Loading climate models...','Running rainfall simulation...','Simulating flood cascades...','Analyzing railway impact...','Forecasting crop yields...','Predicting disease vectors...','Estimating economic losses...','Computing intervention trees...','Running MC iteration 3,847/10,000...','Running MC iteration 7,213/10,000...','Convergence check passed ✓','Generating Scenario A...','Generating Scenario B...','Generating Scenario C...','Commander Agent synthesizing...','Simulation complete ✓'];
+function runSim(btn) {
+  const wrap=document.getElementById('sim-wrap');
+  const fill=document.getElementById('sim-fill');
+  const pct=document.getElementById('sim-pct');
+  const msg=document.getElementById('sim-msg');
+  btn.disabled=true;btn.textContent='⏳ Running...';
+  wrap.style.display='block';fill.style.width='0';
+  let p=0,si=0;
+  const iv=setInterval(()=>{
+    p=Math.min(100,p+Math.random()*7+1.5);
+    fill.style.width=p+'%';pct.textContent=Math.round(p)+'%';
+    if(si<SIM_MSGS.length-1&&p>(si+1)/SIM_MSGS.length*100)si++;
+    msg.textContent=SIM_MSGS[si];
+    if(p>=100){
+      clearInterval(iv);
+      setTimeout(()=>{wrap.style.display='none';btn.disabled=false;btn.textContent='⚡ Re-Simulate';fill.style.width='0';},700);
+    }
+  },110);
+}
+
+/* ══ INIT ═══════════════════════════════════════════════════════════════════ */
+// Auto-refresh nav status
+setInterval(()=>{
+  const statuses=['SYSTEM ACTIVE','AGENTS ONLINE','ANALYZING...','SIMULATING...','SYSTEM ACTIVE'];
+  document.getElementById('nav-status-txt').textContent=statuses[Math.floor(Date.now()/5000)%statuses.length];
+},5000);
+</script>
+</body>
+</html>
